@@ -307,12 +307,19 @@ export default function SeatingArrangement() {
     if (selectedSeats.length < 2) return;
 
     const firstSelected = selectedSeats[0];
+    let lastX = firstSelected.x;
+    let lastY = firstSelected.y;
+
     const updatedSeats = seats.map(seat => {
       if (seat.selected) {
         if (direction === 'vertical') {
-          return { ...seat, x: firstSelected.x };
+          const newY = lastY;
+          lastY += 60; // Add a gap between seats
+          return { ...seat, x: firstSelected.x, y: newY };
         } else {
-          return { ...seat, y: firstSelected.y };
+          const newX = lastX;
+          lastX += 70; // Add a gap between seats
+          return { ...seat, y: firstSelected.y, x: newX };
         }
       }
       return seat;
