@@ -11,11 +11,8 @@
       "handle": "filesystem"
     },
     {
-      "src": "/(.*)",
-      "dest": "/"
+      "src": "/.*",
+      "dest": "/index"
     }
-  ],
-  "fallback": {
-    "source": "/fallback.html"
-  }
+  ]
 }
