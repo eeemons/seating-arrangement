@@ -1,11 +1,6 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "next.config.js",
-      "use": "@vercel/next"
-    }
-  ],
+  "buildCommand": "npm install --legacy-peer-deps && npm run build",
   "routes": [
     {
       "handle": "filesystem"
@@ -14,6 +9,5 @@
       "src": "/.*",
       "dest": "/index"
     }
-  ],
-  "buildCommand": "npm install --legacy-peer-deps && npm run build"
+  ]
 }
