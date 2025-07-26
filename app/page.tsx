@@ -5,15 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, RotateCcw, Users, Edit3, Trash2, GripVertical } from 'lucide-react';
+import { Plus, RotateCcw, Users, Edit3, Trash2, GripVertical, RotateCw, AlignVerticalJustifyStart, AlignHorizontalJustifyStart } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu';
 
 interface Seat {
   id: string;
   name: string;
   x: number;
   y: number;
+  rotation: number;
   selected?: boolean;
 }
 
@@ -26,7 +28,7 @@ export default function SeatingArrangement() {
   const [seats, setSeats] = useState<Seat[]>([]);
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [seatCount, setSeatCount] = useState<number>(1);
+  const [seatCount, setSeatCount] = useState<string>("1");
   const [isDragging, setIsDragging] = useState<string | null>(null);
   const [isDraggingMultiple, setIsDraggingMultiple] = useState<boolean>(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -37,7 +39,6 @@ export default function SeatingArrangement() {
   const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Save state to history
   const saveToHistory = useCallback((newSeats: Seat[]) => {
     const newHistoryState: HistoryState = {
       seats: JSON.parse(JSON.stringify(newSeats)),
@@ -45,11 +46,9 @@ export default function SeatingArrangement() {
     };
     
     setHistory(prev => {
-      // Remove any future history if we're not at the end
       const newHistory = prev.slice(0, historyIndex + 1);
       newHistory.push(newHistoryState);
       
-      // Keep only last 50 states to prevent memory issues
       if (newHistory.length > 50) {
         newHistory.shift();
         return newHistory;
@@ -61,7 +60,6 @@ export default function SeatingArrangement() {
     setHistoryIndex(prev => Math.min(prev + 1, 49));
   }, [historyIndex]);
 
-  // Undo function
   const undo = useCallback(() => {
     if (historyIndex > 0) {
       const previousState = history[historyIndex - 1];
@@ -71,19 +69,24 @@ export default function SeatingArrangement() {
   }, [history, historyIndex]);
 
   const generateSeats = useCallback(() => {
+    const numSeats = parseInt(seatCount, 10);
+    if (isNaN(numSeats) || numSeats <= 0) return;
+
     const newSeats: Seat[] = [];
+    const existingSeatCount = seats.length;
     
-    for (let i = 0; i < seatCount; i++) {
-      // Arrange seats in a rough grid pattern initially
-      const cols = Math.ceil(Math.sqrt(seatCount));
-      const row = Math.floor(i / cols);
-      const col = i % cols;
+    for (let i = 0; i < numSeats; i++) {
+      const totalIndex = existingSeatCount + i;
+      const cols = Math.ceil(Math.sqrt(numSeats + existingSeatCount));
+      const row = Math.floor(totalIndex / cols);
+      const col = totalIndex % cols;
       
       newSeats.push({
         id: `seat-${Date.now()}-${i}`,
-        name: `Seat ${i + 1}`,
+        name: `Seat ${totalIndex + 1}`,
         x: 50 + col * 80,
         y: 50 + row * 70,
+        rotation: 0,
         selected: false,
       });
     }
@@ -123,16 +126,13 @@ export default function SeatingArrangement() {
     const selectedSeats = getSelectedSeats();
     const isCurrentSeatSelected = seat.selected;
 
-    // Handle selection
     if (e.ctrlKey) {
       toggleSeatSelection(seatId, true);
     } else if (!isCurrentSeatSelected) {
       toggleSeatSelection(seatId, false);
     }
 
-    // Handle dragging
     if (selectedSeats.length > 1 && isCurrentSeatSelected) {
-      // Multi-seat drag
       setIsDraggingMultiple(true);
       const offsets: Record<string, { x: number; y: number }> = {};
       selectedSeats.forEach(selectedSeat => {
@@ -143,7 +143,6 @@ export default function SeatingArrangement() {
       });
       setMultiDragOffsets(offsets);
     } else {
-      // Single seat drag
       setIsDragging(seatId);
       setDragOffset({
         x: e.clientX - containerRect.left - seat.x,
@@ -151,7 +150,6 @@ export default function SeatingArrangement() {
       });
     }
     
-    // Prevent text selection during drag
     document.body.style.userSelect = 'none';
   };
 
@@ -181,15 +179,14 @@ export default function SeatingArrangement() {
       const endY = e.clientY - containerRect.top;
       setSelectionBox(prev => prev ? { ...prev, endX, endY } : null);
 
-      // Update seat selection based on selection box
       const minX = Math.min(selectionBox.startX, endX);
       const maxX = Math.max(selectionBox.startX, endX);
       const minY = Math.min(selectionBox.startY, endY);
       const maxY = Math.max(selectionBox.startY, endY);
 
       setSeats(prev => prev.map(seat => {
-        const seatCenterX = seat.x + 25; // Half of seat width
-        const seatCenterY = seat.y + 20; // Half of seat height
+        const seatCenterX = seat.x + 25;
+        const seatCenterY = seat.y + 20;
         const isInSelection = seatCenterX >= minX && seatCenterX <= maxX && 
                              seatCenterY >= minY && seatCenterY <= maxY;
         return { ...seat, selected: isInSelection };
@@ -227,7 +224,6 @@ export default function SeatingArrangement() {
   }, [isDragging, isDraggingMultiple, isSelecting, dragOffset, multiDragOffsets, selectionBox]);
 
   const handleMouseUp = useCallback(() => {
-    // Save to history when drag ends
     if (isDragging || isDraggingMultiple) {
       saveToHistory(seats);
     }
@@ -295,10 +291,47 @@ export default function SeatingArrangement() {
     setHistoryIndex(-1);
   };
 
+  const rotateSelectedSeats = (direction: 'left' | 'right') => {
+    const updatedSeats = seats.map(seat => {
+      if (seat.selected) {
+        return { ...seat, rotation: seat.rotation + (direction === 'left' ? -90 : 90) };
+      }
+      return seat;
+    });
+    setSeats(updatedSeats);
+    saveToHistory(updatedSeats);
+  };
+
+  const alignSelectedSeats = (direction: 'vertical' | 'horizontal') => {
+    const selectedSeats = getSelectedSeats();
+    if (selectedSeats.length < 2) return;
+
+    const firstSelected = selectedSeats[0];
+    const updatedSeats = seats.map(seat => {
+      if (seat.selected) {
+        if (direction === 'vertical') {
+          return { ...seat, x: firstSelected.x };
+        } else {
+          return { ...seat, y: firstSelected.y };
+        }
+      }
+      return seat;
+    });
+    setSeats(updatedSeats);
+    saveToHistory(updatedSeats);
+  };
+
+  const handleSeatCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (/^\d*$/.test(value)) {
+      setSeatCount(value);
+    }
+  };
+
   const selectedCount = getSelectedSeats().length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -315,15 +348,13 @@ export default function SeatingArrangement() {
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-3">
                 <Label htmlFor="seatCount" className="text-sm font-medium text-slate-700">
-                  Number of seats:
+                  Number of seats to add:
                 </Label>
                 <Input
                   id="seatCount"
-                  type="number"
-                  min="1"
-                  max="50"
+                  type="text"
                   value={seatCount}
-                  onChange={(e) => setSeatCount(parseInt(e.target.value) || 1)}
+                  onChange={handleSeatCountChange}
                   className="w-20 h-10"
                 />
               </div>
@@ -374,102 +405,125 @@ export default function SeatingArrangement() {
         </Card>
 
         {/* Seating Layout Area */}
-        <Card className="shadow-xl border-0 bg-white overflow-hidden">
-          <CardContent className="p-0">
-            <div className="bg-slate-800 text-white p-4">
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <GripVertical className="h-5 w-5" />
-                Drag seats to arrange your layout
-              </h2>
-            </div>
-            
-            <div 
-              ref={containerRef}
-              className="relative bg-slate-50 h-[600px] overflow-auto border-2 border-dashed border-slate-200 touch-none"
-              style={{ cursor: isDragging || isDraggingMultiple ? 'grabbing' : 'default' }}
-              onMouseDown={handleContainerMouseDown}
-            >
-              {/* Selection Box */}
-              {selectionBox && (
-                <div
-                  className="absolute border-2 border-blue-400 bg-blue-100 bg-opacity-30 pointer-events-none z-40"
-                  style={{
-                    left: Math.min(selectionBox.startX, selectionBox.endX),
-                    top: Math.min(selectionBox.startY, selectionBox.endY),
-                    width: Math.abs(selectionBox.endX - selectionBox.startX),
-                    height: Math.abs(selectionBox.endY - selectionBox.startY),
-                  }}
-                />
-              )}
-              
-              {seats.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center text-slate-400">
-                    <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium">No seats added yet</p>
-                    <p>Add some seats to start designing your layout</p>
-                  </div>
+        <ContextMenu>
+          <ContextMenuTrigger>
+            <Card className="shadow-xl border-0 bg-white overflow-hidden">
+              <CardContent className="p-0">
+                <div className="bg-slate-800 text-white p-4">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <GripVertical className="h-5 w-5" />
+                    Drag seats to arrange your layout
+                  </h2>
                 </div>
-              )}
-              
-              {seats.map((seat) => (
-                <div
-                  key={seat.id}
-                  className={`absolute select-none will-change-transform ${
-                    isDragging === seat.id || (isDraggingMultiple && seat.selected)
-                      ? 'z-50 scale-105 shadow-xl cursor-grabbing transition-none' 
-                      : 'cursor-grab hover:scale-102 hover:shadow-md transition-all duration-150 ease-out'
-                  }`}
-                  style={{
-                    left: seat.x,
-                    top: seat.y,
-                    transform: (isDragging === seat.id || (isDraggingMultiple && seat.selected)) ? 'translateZ(0)' : undefined,
-                  }}
-                  onMouseDown={(e) => handleMouseDown(e, seat.id)}
+                
+                <div 
+                  ref={containerRef}
+                  className="relative bg-slate-50 h-[600px] overflow-auto border-2 border-dashed border-slate-200 touch-none"
+                  style={{ cursor: isDragging || isDraggingMultiple ? 'grabbing' : 'default' }}
+                  onMouseDown={handleContainerMouseDown}
                 >
-                  <Card className={`w-16 h-14 ${
-                    seat.selected
-                      ? 'bg-blue-100 border-blue-400 border-2'
-                      : isDragging === seat.id || (isDraggingMultiple && seat.selected)
-                      ? 'bg-blue-100 border-blue-400 border-2' 
-                      : 'bg-white border-slate-200 hover:border-blue-300'
-                  }`}>
-                    <CardContent className="p-1 h-full flex flex-col justify-between">
-                      <div className="flex justify-between items-start">
-                        <GripVertical className="h-2 w-2 text-slate-400" />
-                        <div className="flex gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditDialog(seat);
-                            }}
-                            className="text-slate-400 hover:text-blue-600 transition-colors"
-                          >
-                            <Edit3 className="h-2 w-2" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteSeat(seat.id);
-                            }}
-                            className="text-slate-400 hover:text-red-600 transition-colors"
-                          >
-                            <Trash2 className="h-2 w-2" />
-                          </button>
-                        </div>
+                  {/* Selection Box */}
+                  {selectionBox && (
+                    <div
+                      className="absolute border-2 border-blue-400 bg-blue-100 bg-opacity-30 pointer-events-none z-40"
+                      style={{
+                        left: Math.min(selectionBox.startX, selectionBox.endX),
+                        top: Math.min(selectionBox.startY, selectionBox.endY),
+                        width: Math.abs(selectionBox.endX - selectionBox.startX),
+                        height: Math.abs(selectionBox.endY - selectionBox.startY),
+                      }}
+                    />
+                  )}
+                  
+                  {seats.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center text-slate-400">
+                        <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                        <p className="text-lg font-medium">No seats added yet</p>
+                        <p>Add some seats to start designing your layout</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-[10px] font-medium text-slate-700 truncate leading-tight">
-                          {seat.name}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  )}
+                  
+                  {seats.map((seat) => (
+                    <div
+                      key={seat.id}
+                      className={`absolute select-none will-change-transform ${
+                        isDragging === seat.id || (isDraggingMultiple && seat.selected)
+                          ? 'z-50 scale-105 shadow-xl cursor-grabbing transition-none' 
+                          : 'cursor-grab hover:scale-102 hover:shadow-md transition-all duration-150 ease-out'
+                      }`}
+                      style={{
+                        left: seat.x,
+                        top: seat.y,
+                        transform: `rotate(${seat.rotation}deg)`,
+                      }}
+                      onMouseDown={(e) => handleMouseDown(e, seat.id)}
+                    >
+                      <Card className={`w-16 h-14 ${
+                        seat.selected
+                          ? 'bg-blue-100 border-blue-400 border-2'
+                          : isDragging === seat.id || (isDraggingMultiple && seat.selected)
+                          ? 'bg-blue-100 border-blue-400 border-2' 
+                          : 'bg-white border-slate-200 hover:border-blue-300'
+                      }`}>
+                        <CardContent className="p-1 h-full flex flex-col justify-between">
+                          <div className="flex justify-between items-start">
+                            <GripVertical className="h-2 w-2 text-slate-400" />
+                            <div className="flex gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditDialog(seat);
+                                }}
+                                className="text-slate-400 hover:text-blue-600 transition-colors"
+                              >
+                                <Edit3 className="h-2 w-2" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteSeat(seat.id);
+                                }}
+                                className="text-slate-400 hover:text-red-600 transition-colors"
+                              >
+                                <Trash2 className="h-2 w-2" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] font-medium text-slate-700 truncate leading-tight">
+                              {seat.name}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onClick={() => rotateSelectedSeats('left')} disabled={selectedCount === 0}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Rotate Left
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => rotateSelectedSeats('right')} disabled={selectedCount === 0}>
+              <RotateCw className="h-4 w-4 mr-2" />
+              Rotate Right
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => alignSelectedSeats('vertical')} disabled={selectedCount < 2}>
+              <AlignVerticalJustifyStart className="h-4 w-4 mr-2" />
+              Align Vertical
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => alignSelectedSeats('horizontal')} disabled={selectedCount < 2}>
+              <AlignHorizontalJustifyStart className="h-4 w-4 mr-2" />
+              Align Horizontal
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
 
         {/* Edit Dialog */}
         <Dialog open={!!editingSeat} onOpenChange={() => setEditingSeat(null)}>
@@ -515,7 +569,7 @@ export default function SeatingArrangement() {
             <li>Hold <kbd className="px-1 py-0.5 bg-slate-200 rounded text-xs">Ctrl</kbd> and click seats to select multiple</li>
             <li>Click and drag on empty space to select seats with a selection box</li>
             <li>Drag any selected seat to move all selected seats together</li>
-            <li>Click on empty space (without Ctrl) to clear selection</li>
+            <li>Right-click on the seating area to open the context menu</li>
             <li>Use the <strong>Undo</strong> button to revert recent changes</li>
           </ul>
         </div>
